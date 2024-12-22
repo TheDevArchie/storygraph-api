@@ -1,3 +1,4 @@
+from tokenize import Whitespace
 from storygraph_api.request.books_request import BooksScraper
 from storygraph_api.exception_handler import parsing_exception
 from bs4 import BeautifulSoup
@@ -25,9 +26,12 @@ class BooksParser:
         pattern = re.compile(r"Description<\/h4><div class=\"trix-content mt-3\">(.*?)<\/div>", re.DOTALL)
         match = pattern.search(desc)
         description = match.group(1).strip()
-        review_content = BooksScraper.community_reviews(book_id) 
+        review_content = BooksScraper.community_reviews(book_id)
         rev_soup = BeautifulSoup(review_content,'html.parser')
         avg_rating = rev_soup.find('span',class_="average-star-rating").text.strip()
+        moods = _parse_moods(rev_soup)
+        paces = _parse_pace(rev_soup)
+
         data = {
                 'title':title,
                 'authors': authors,
@@ -35,9 +39,12 @@ class BooksParser:
                 'first_pub': first_pub,
                 'tags': tags,
                 'average_rating': avg_rating,
-                'description':description
+                'description':description,
+                'moods': moods,
+                'paces': paces
                 }
-        return data 
+
+        return data
 
     @staticmethod
     @parsing_exception
@@ -56,3 +63,35 @@ class BooksParser:
                 'book_id': book_id
             })
         return search_results
+
+
+def _parse_moods(rev_soup: BeautifulSoup) -> dict[str, int]:
+    """
+    Returns:
+        dict[str, int]: Moods along with their percentage.
+    """
+    moods = {}
+    moods_div = rev_soup.find('div', class_='moods-list-reviews')
+
+    for mood in moods_div.find_all('span', class_='md:mr-1'):
+        mood_type = mood.text.strip()
+        percentage = int(mood.find_next_sibling().text.strip('%'))
+        moods[mood_type] = percentage
+
+    return moods
+
+
+def _parse_pace(rev_soup: BeautifulSoup) -> dict[str, int]:
+    """
+    Returns
+        dict[str, int]: Moods along with their percentage.
+    """
+    paces = {}
+    pace_div = rev_soup.find('div', class_='paces-reviews')
+
+    for pace in pace_div.find_all('span', class_='md:mr-1'):
+        pace_type = pace.text.strip()
+        percentage = int(pace.find_next_sibling().text.strip('%'))
+        paces[pace_type] = percentage
+
+    return paces
